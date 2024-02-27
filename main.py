@@ -1,5 +1,12 @@
 # %%
+import os
+from typing import List
+
+import dotenv
 import polars as pl
+import pyarrow as pa
+from pyarrow import fs
+from pyarrow.dataset import dataset
 
 
 def get_log_json(paths: str | list[str]) -> pl.LazyFrame:
@@ -12,11 +19,15 @@ def get_log_json(paths: str | list[str]) -> pl.LazyFrame:
         pl.LazyFame
     """
     # Define schema of logging data
+
+    if isinstance(paths, str):
+        paths = [paths]
+
     schema = {
-        "_index" : pl.String,
-        "_type"  : pl.String,
-        "_id"    : pl.String,
-        "_score" : pl.Int64,
+        "_index": pl.String,
+        "_type": pl.String,
+        "_id": pl.String,
+        "_score": pl.Int64,
         "_source": pl.Struct(
             [
                 pl.Field("Contract", pl.String),
@@ -27,7 +38,7 @@ def get_log_json(paths: str | list[str]) -> pl.LazyFrame:
         ),
     }
 
-    def _scan_log(path, schema)  -> pl.LazyFrame:
+    def _scan_log(path, schema) -> pl.LazyFrame:
         return (
             pl.scan_ndjson(path, schema=schema, low_memory=True)
             .with_columns(pl.Series("Date", [path]).str.extract(r"\d{8}", 0))
@@ -53,38 +64,100 @@ def get_log_json(paths: str | list[str]) -> pl.LazyFrame:
     return pl.concat(dfs, how="vertical").lazy()
 
 
-def get_rfm_table(sources: pl.LazyFrame, reported_date: str, **options) -> pl.LazyFrame:
-    """
-    Function to get the recency, frequency, and monetary value of the data
-    Args:
-        sources (pl.LazyFrame): the source data
-        reported_date (str): the date when the data is reported, must be in format "%Y %m %d"
-        options: the options to calculate the rfm value
+def get_rfm_table(
+    sources: pl.LazyFrame, reported_date: str = "20220501", total_date: int = 30
+) -> pl.LazyFrame:
+    if not isinstance(sources, pl.LazyFrame):
+        sources = sources.lazy()
 
-    Returns:
-        pl.LazyFrame
-    """
-    total_date = options.get("total_date", 30)
-    temp_tbl = sources.group_by("Contract").agg(pl.max("Date").alias("LastDate"))
+    b: pl.LazyFrame = sources.group_by("Contract").agg(
+        pl.col("Date").max().alias("LatestDate")
+    )
 
-    # recency_window = pl.Expr.p`
-    # Get the recency, frequency, and monetary value
+    temp = sources.with_columns(
+        pl.lit(reported_date).str.to_date("%Y %m %d").alias("ReportedDate")
+    )
+
     rfm = (
-        sources
-        .groupby("Mac")
+        temp.filter(pl.col("Contract").str.len_chars() > 1)
+        .join(b, on="Contract", how="left")
+        .group_by("Contract")
         .agg(
-            pl.col("Date").max().alias("LastDate"),
-            pl.count(pl.col("Date")).alias("Frequency"),
-            pl.sum(pl.col("TotalDuration")).alias("Monetary"),
+            (pl.col("ReportedDate") - pl.col("LatestDate")).min().alias("Recency"),
+            (pl.col("Date").n_unique().cast(pl.Float32) / pl.lit(total_date) * 100.0)
+            .round(2)
+            .alias("Frequency"),
+            pl.col("TotalDuration").sum().alias("Monetary"),
+        )
+        .with_columns(
+            pl.col("Recency")
+            .qcut(3, labels=["1", "2", "3"], allow_duplicates=True)
+            .alias("R"),
+            pl.col("Frequency")
+            .qcut(3, labels=["1", "2", "3"], allow_duplicates=True)
+            .alias("F"),
+            pl.col("Monetary")
+            .qcut(3, labels=["1", "2", "3"], allow_duplicates=True)
+            .alias("M"),
         )
     )
-    # Calculate the recency, frequency, and monetary value
-    rfm: pl.LazyFrame = rfm.with_columns(
-        pl.col("LastDate").date_diff(reported_date, pl.DateUnits.Day).alias("Recency")
+
+    return rfm
+
+
+# setup cloud filesystem access
+def ingest_by_pyarrow(paths: List[str] = None):
+    dotenv.load_dotenv()
+    cloudfs = fs.S3FileSystem(
+        access_key=os.getenv("AWS_ACCESS_KEY_ID"),
+        secret_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region=os.getenv("AWS_REGION"),
+        endpoint_override="http://127.0.0.1:9000",
     )
 
-    pl.all_horizontal()
-    return rfm
+    schema = pa.schema(
+        [
+            pa.field("_index", pa.string()),
+            pa.field("_type", pa.string()),
+            pa.field("_id", pa.string()),
+            pa.field("_score", pa.int64()),
+            pa.field(
+                "_source",
+                pa.struct(
+                    [
+                        pa.field("Contract", pa.string()),
+                        pa.field("Mac", pa.string()),
+                        pa.field("TotalDuration", pa.int64()),
+                        pa.field("AppName", pa.string()),
+                    ]
+                ),
+            ),
+        ]
+    )
+    df = []
+
+    for path in paths:
+        ds = dataset(
+            source=path,
+            schema=schema,
+            filesystem=cloudfs,
+            format="json",
+        )
+        df.append(
+            pl.scan_pyarrow_dataset(ds)
+            .with_columns(pl.Series("Date", [path]).str.extract(r"\d{8}", 0))
+            .select(
+                pl.col("Date").str.to_date("%Y %m %d"),
+                pl.col("_index").alias("Index"),
+                pl.col("_type").alias("Type"),
+                pl.col("_id").alias("Id"),
+                pl.col("_score").alias("Score"),
+                pl.col("_source"),
+            )
+            .unnest("_source")
+        )
+
+    return pl.concat(df)
 
 
 def main() -> None:

@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "polarspipeline"
+version = "0.1.0"
+description = ""
+authors = ["andreale28 <lhson43680@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+polars = "^0.20.10"
+duckdb = "^0.10.0"
+opendal = "^0.45.0"
+jupyter = "^1.0.0"
+deltalake = "^0.15.3"
+python-dotenv = "^1.0.1"
+ruff = "^0.2.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

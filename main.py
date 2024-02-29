@@ -1,4 +1,3 @@
-# %%
 import os
 from typing import List
 
@@ -65,7 +64,7 @@ def get_log_json(paths: str | list[str]) -> pl.LazyFrame:
 
 
 def get_rfm_table(
-    sources: pl.LazyFrame, reported_date: str = "20220501", total_date: int = 30
+    sources: pl.LazyFrame, reported_date: str = "20220501", total_date: int = 30,
 ) -> pl.LazyFrame:
     if not isinstance(sources, pl.LazyFrame):
         sources = sources.lazy()
@@ -143,6 +142,7 @@ def ingest_by_pyarrow(paths: List[str] = None):
             filesystem=cloudfs,
             format="json",
         )
+        dataset.
         df.append(
             pl.scan_pyarrow_dataset(ds)
             .with_columns(pl.Series("Date", [path]).str.extract(r"\d{8}", 0))

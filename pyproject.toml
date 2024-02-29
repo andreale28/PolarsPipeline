@@ -14,6 +14,7 @@ jupyter = "^1.0.0"
 deltalake = "^0.15.3"
 python-dotenv = "^1.0.1"
 ruff = "^0.2.2"
+ruff-lsp = "^0.0.52"
 
 
 [build-system]

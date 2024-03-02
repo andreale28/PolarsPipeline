@@ -4,7 +4,7 @@ from typing import List
 import dotenv
 import polars as pl
 
-from io import ingest_by_pyarrow, sink_to_parquet
+from io import sink_to_s3, ingest_from_s3
 dotenv.load_dotenv()
 
 

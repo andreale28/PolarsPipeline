@@ -4,7 +4,6 @@ from typing import List
 import dotenv
 import polars as pl
 
-from io import sink_to_s3, ingest_from_s3
 dotenv.load_dotenv()
 
 
@@ -13,6 +12,17 @@ def get_rfm_table(
     reported_date: str = "20220501",
     total_date: int = 30,
 ) -> pl.LazyFrame:
+    """
+    Generates an RFM (Recency, Frequency, Monetary) table from the provided data.
+
+    Args:
+        sources (pl.LazyFrame): The source data to calculate RFM values from.
+        reported_date (str, optional): The date to report. Defaults to "20220501".
+        total_date (int, optional): The total number of dates to consider. Defaults to 30.
+
+    Returns:
+        pl.LazyFrame: The resulting RFM table.
+    """
     if not isinstance(sources, pl.LazyFrame):
         sources = sources.lazy()
 
@@ -46,6 +56,12 @@ def get_rfm_table(
             .qcut(3, labels=["1", "2", "3"], allow_duplicates=True)
             .alias("M"),
         )
+        .select(
+            pl.concat_str(["R", "F", "M"]).alias("RFM"),
+            pl.lit(reported_date)
+            .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
+            .alias("ReportedDate"),
+        )
     )
 
     return rfm
@@ -55,6 +71,7 @@ def get_pivot_data(
     sources: pl.LazyFrame,
     app_names: List[str],
     column_names: List[str],
+    reported_date: str = "20220501",
 ) -> pl.LazyFrame:
     """
     Function to pivot data based on the provided sources, app_names, and column_names.
@@ -63,6 +80,7 @@ def get_pivot_data(
         sources (pl.LazyFrame): The input lazy frame containing the data.
         app_names (List[str]): The list of application names.
         column_names (List[str]): The list of column names.
+        reported_date (str): the new reported date for log data
 
     Returns:
         pl.LazyFrame: The pivoted lazy frame based on the provided data.
@@ -95,18 +113,27 @@ def get_pivot_data(
                 for y in set(column_names)
             ]
         )
+        .with_columns(
+            pl.lit(reported_date)
+            .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
+            .alias("ReportedDate")
+        )
         .sort(["Contract", "TVDuration"])
     )
 
     return pivot_df
 
 
-def get_most_watch(sources: pl.LazyFrame) -> pl.LazyFrame:
+def get_most_watch(
+    sources: pl.LazyFrame,
+    reported_date: str = "20220501",
+) -> pl.LazyFrame:
     """
     Get the most watched item for each contract in the LazyFrame.
 
     Args:
         sources (pl.LazyFrame): The pivot lazyframe from the get_pivot_data function
+        reported_date (str): the new reported date for log data
 
     Returns:
         pl.LazyFrame: The LazyFrame with the most watched item for each contract.
@@ -130,8 +157,7 @@ def get_most_watch(sources: pl.LazyFrame) -> pl.LazyFrame:
         .list.first()
         .struct.field("k")
         .alias("MostWatch"),
+        pl.lit(reported_date)
+        .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
+        .alias("ReportedDate"),
     )
-
-
-def main() -> None:
-    pass

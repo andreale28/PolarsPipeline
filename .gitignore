@@ -4,6 +4,8 @@
 .ruff_cache
 data
 .fleet
+.vscode
+.idea
 # User-specific stuff
 .idea/**/workspace.xml
 .idea/**/tasks.xml

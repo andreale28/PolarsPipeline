@@ -5,6 +5,9 @@
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/data" />
       <excludeFolder url="file://$MODULE_DIR$/venv" />
+      <excludeFolder url="file://$MODULE_DIR$/.fleet" />
+      <excludeFolder url="file://$MODULE_DIR$/.idea/dataSources" />
+      <excludeFolder url="file://$MODULE_DIR$/notebooks/.ipynb_checkpoints" />
     </content>
     <orderEntry type="jdk" jdkName="Poetry (PolarsPipeline)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

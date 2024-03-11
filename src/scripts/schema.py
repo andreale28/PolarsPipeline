@@ -1,7 +1,12 @@
+from datetime import datetime
+from typing import Optional
+
 import polars as pl
 import pyarrow as pa
+import patito as pt
+from patito import Model
 
-pl_schema = {
+PL_SCHEMA = {
     "_index": pl.String,
     "_type": pl.String,
     "_id": pl.String,
@@ -16,7 +21,7 @@ pl_schema = {
     ),
 }
 
-pa_schema = pa.schema(
+PA_SCHEMA = pa.schema(
     [
         pa.field("_index", pa.string()),
         pa.field("_type", pa.string()),
@@ -35,3 +40,17 @@ pa_schema = pa.schema(
         ),
     ]
 )
+
+
+class Output(Model):
+    Contract: str = pt.Field(dtype=pl.String, unique=True)
+    TVDuration: int = pt.Field(dtype=pl.Int64)
+    ChildDuration: int = pt.Field(dtype=pl.Int64)
+    SportDuration: int = pt.Field(dtype=pl.Int64)
+    RelaxDuration: int = pt.Field(dtype=pl.Int64)
+    MovieDuration: int = pt.Field(dtype=pl.Int64)
+    RFM: int = pt.Field(dtype=pl.Int64)
+    MostWatch: str = pt.Field(dtype=pl.String)
+    is_current: bool = pt.Field(dtype=pl.Boolean)
+    effective_time: datetime = pt.Field(dtype=pl.Datetime)
+    end_time: Optional[datetime]

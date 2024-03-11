@@ -1,4 +1,3 @@
-# %%
 from typing import List
 
 import dotenv
@@ -57,21 +56,20 @@ def get_rfm_table(
             .alias("M"),
         )
         .select(
-            pl.concat_str(["R", "F", "M"]).alias("RFM"),
-            pl.lit(reported_date)
-            .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
-            .alias("ReportedDate"),
+            pl.col("Contract"),
+            pl.concat_str([pl.col("R"), pl.col("F"), pl.col("M")])
+            .alias("RFM")
+            .cast(pl.Int64),
         )
     )
 
     return rfm
 
 
-def get_pivot_data(
+def get_pivot_table(
     sources: pl.LazyFrame,
     app_names: List[str],
     column_names: List[str],
-    reported_date: str = "20220501",
 ) -> pl.LazyFrame:
     """
     Function to pivot data based on the provided sources, app_names, and column_names.
@@ -80,7 +78,6 @@ def get_pivot_data(
         sources (pl.LazyFrame): The input lazy frame containing the data.
         app_names (List[str]): The list of application names.
         column_names (List[str]): The list of column names.
-        reported_date (str): the new reported date for log data
 
     Returns:
         pl.LazyFrame: The pivoted lazy frame based on the provided data.
@@ -112,11 +109,6 @@ def get_pivot_data(
                 .alias(y)
                 for y in set(column_names)
             ]
-        )
-        .with_columns(
-            pl.lit(reported_date)
-            .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
-            .alias("ReportedDate")
         )
         .sort(["Contract", "TVDuration"])
     )
@@ -157,7 +149,35 @@ def get_most_watch(
         .list.first()
         .struct.field("k")
         .alias("MostWatch"),
-        pl.lit(reported_date)
-        .str.to_datetime(format="%Y-%m-%d %H:%M:%S")
-        .alias("ReportedDate"),
+    )
+
+
+def get_gold_table(
+    sources: pl.LazyFrame,
+    reported_date="20220501",
+    **options,
+) -> pl.LazyFrame:
+    """
+    Get the gold table from the delta lake.
+
+    Returns:
+        pl.LazyFrame: The gold table.
+    """
+    app_names = options.get("app_names")
+    columns_names = options.get("columns_names")
+
+    rfm_tbl = get_rfm_table(sources)
+    pivot_tbl = get_pivot_table(sources, app_names, columns_names)
+    most_watch_tbl = get_most_watch(pivot_tbl)
+
+    return (
+        pivot_tbl.join(rfm_tbl, on="Contract", how="left")
+        .join(most_watch_tbl, on="Contract", how="left")
+        .with_columns(
+            pl.lit(True).alias("is_current"),
+            pl.lit(reported_date)
+            .str.strptime(pl.Datetime, format="%Y %m %d")
+            .alias("effective_time"),
+            pl.lit(None, pl.Datetime).alias("end_time"),
+        )
     )

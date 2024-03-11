@@ -1,12 +1,12 @@
 import os
-from typing import List, Mapping, Any
+from typing import Any, List, Mapping
 
+import dotenv
 import polars as pl
 import pyarrow as pa
 import pyarrow.parquet as pq
 from pyarrow import fs
 from pyarrow.dataset import dataset
-import dotenv
 
 dotenv.load_dotenv()
 
@@ -92,7 +92,7 @@ def ingest_from_local(
             pl.scan_ndjson(path, schema=schema, low_memory=True)
             .with_columns(pl.Series("Date", [path]).str.extract(r"\d{8}", 0))
             .select(
-                pl.col("Date").str.to_date("%Y %m %d"),
+                pl.col("Date").str.strptime(pl.Datetime, format="%Y %m %d"),
                 pl.col("_index").alias("Index"),
                 pl.col("_type").alias("Type"),
                 pl.col("_id").alias("Id"),
@@ -208,7 +208,7 @@ def type2_scd_upsert_pl(
     """
     Perform a Type 2 Slowly Changing Dimension (SCD) upsert operation using Polars LazyFrame/DataFrame and
     write to Delta Lake using pl.write_delta().
-    Note that, the datatypes of **effective_time_col** and **end_time_col** should be in **datetime**
+    Note that, the datatypes of **effective_time_col** and **end_time_col** should be in **pl.Datetime** dtypes
 
     Args:
         sources_df (pl.LazyFrame): The source or target Polars LazyFrame scanned from DeltaLake using pl.scan_delta().
@@ -269,10 +269,11 @@ def type2_scd_upsert_pl(
     ]
     updates_records = sources_df.join(updates_df, on=primary_key, how="inner").filter(
         pl.any_horizontal(
-            (pl.col(is_current_col) == True),
+            (pl.col(is_current_col) == True),  # noqa: E712
             *updates_conds,
         )
     )
+
     open_exprs = [(pl.col(f"{attr}_right").alias(f"{attr}")) for attr in attr_cols]
     open_records = updates_records.select(
         pl.col(primary_key),

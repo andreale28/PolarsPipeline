@@ -286,3 +286,4 @@ cython_debug/
 /notebooks/delta_lake1/
 /notebooks/.ipynb_checkpoints/
 
+/minio/

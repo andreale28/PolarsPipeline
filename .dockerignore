@@ -1,0 +1,9 @@
+astro
+.git
+airflow_settings.yaml
+logs/
+.venv
+airflow.db
+airflow.cfg
+data
+/minio/

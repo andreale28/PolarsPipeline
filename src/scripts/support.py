@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Mapping
+from typing import Any, List, Mapping, Literal
 
 import dotenv
 import polars as pl
@@ -12,9 +12,8 @@ dotenv.load_dotenv()
 
 
 def ingest_from_s3(
-    paths: List[str],
+    base_path: str,
     schema: pa.Schema,
-    base_path: str = None,
 ) -> pl.LazyFrame:
     """
     Ingests data from specified paths using PyArrow, create a columns with date getting from the filename,
@@ -23,7 +22,6 @@ def ingest_from_s3(
     LazyFrame.
 
     Args:
-        paths (List[str]): List of paths to ingest data from.
         schema (pa.Schema): The schema to use for the data.
         base_path (str, optional): The base path for the file system. Defaults to None.
 
@@ -34,7 +32,8 @@ def ingest_from_s3(
         access_key=os.getenv("AWS_ACCESS_KEY_ID"),
         secret_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
         region=os.getenv("AWS_REGION"),
-        endpoint_override="http://127.0.0.1:9000",
+        scheme="http",
+        endpoint_override="miniostorage:9000",
     )
 
     s3_files = [
@@ -113,7 +112,10 @@ def ingest_from_local(
 
 
 def sink_to_s3(
-    sources: pl.LazyFrame, path: str, compression: str = "zstd", **options
+    sources: pl.LazyFrame,
+    path: str,
+    compression: str = "zstd",
+    **options,
 ) -> None:
     """
     Writes a Polars LazyFrame to an S3 bucket as a Parquet file.
@@ -169,7 +171,7 @@ def sink_to_s3(
 def sink_delta_to_s3(
     tables: pl.LazyFrame,
     target: str,
-    mode: str = "append",
+    mode: Literal["error", "append", "overwrite", "ignore"],
 ) -> None:
     """
     Sink the proprietary table to delta lake in s3.
@@ -191,6 +193,12 @@ def sink_delta_to_s3(
             "AWS_REGION": os.getenv("AWS_REGION"),
             "AWS_ACCESS_KEY_ID": os.getenv("AWS_ACCESS_KEY_ID"),
             "AWS_SECRET_ACCESS_KEY": os.getenv("AWS_SECRET_ACCESS_KEY"),
+            "AWS_ENDPOINT_URL": "http://miniostorage:9000",
+            "AWS_ALLOW_HTTP": "true",
+            "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
+        },
+        delta_write_options={
+            "engine": "rust",
         },
     )
 

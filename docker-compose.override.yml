@@ -1,0 +1,85 @@
+version: "3.8"
+
+services:
+  minio:
+    image: minio/minio
+    container_name: minio
+    hostname: miniostorage
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: [ "server", "/data", "--console-address", ":9001" ]
+    volumes:
+      - ./minio/data:/data
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=minio123
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+    networks:
+      - airflow
+
+  clickhouse:
+    image: bitnami/clickhouse:latest
+    container_name: clickhouse
+    hostname: clickhouse
+    ports:
+      - "8123:8123"
+      - "9002:9002"
+    environment:
+      - CLICKHOUSE_ADMIN_USER=sonle
+      - CLICKHOUSE_ADMIN_PASSWORD=sonle123
+      - CLICKHOUSE_TCP_PORT=9002
+    volumes:
+      - ./clickhouse/data:/bitnami/clickhouse/
+#      - ./conf/override.xml:/bitnami/clickhouse/etc/conf.d/override.xml:ro
+    networks:
+      - airflow
+
+#  createbuckets:
+#    image: minio/mc
+#    container_name: createbuckets
+#    depends_on:
+#      - minio
+#    environment:
+#      - AWS_ACCESS_KEY_ID=minio
+#      - AWS_SECRET_ACCESS_KEY=minio123
+#      - AWS_REGION=us-east-1
+#    entrypoint: >
+#      /bin/sh -c "
+#      until(/usr/bin/mc config host add minio http://minio:9000 minio minio123) do echo 'waiting for minio' && sleep 1; done;
+#      /usr/bin/mc rm -r --force minio/data;
+#      /usr/bin/mc mb minio/data;
+#      /usr/bin/mc policy set public minio/data;
+#      /usr/bin/mc cp --recursive /data/log_content minio/data/;
+#      exit 0;
+#      "
+#    volumes:
+#      - ./data/log_content:/data/log_content
+#    networks:
+#      - airflow
+#
+  scheduler:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - createbuckets
+    networks:
+      - airflow
+  webserver:
+    depends_on:
+      - createbuckets
+    networks:
+      - airflow
+  triggerer:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - createbuckets
+    networks:
+      - airflow
+  postgres:
+    depends_on:
+      - createbuckets
+    networks:
+      - airflow

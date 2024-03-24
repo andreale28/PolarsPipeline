@@ -201,4 +201,8 @@ ingesting engine which is Delta Engine from Clickhouse.
 > DeltaEngine of Clickhouse
 > to insert it into database.
 
+### On Airflow
+This project uses Airflow with the support of Astro CLI. Astro CLI makes Airflow usage less complicated. For more 
+information on Astro CLI, please refer to Astronomer's homepage.
+
 

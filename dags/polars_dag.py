@@ -10,6 +10,7 @@ from docker.types import Mount
 from airflow_clickhouse_plugin.operators.clickhouse import ClickHouseOperator
 
 dotenv.load_dotenv()
+BASE_PATH = "data/log_content/"
 
 
 @dag(

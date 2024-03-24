@@ -164,10 +164,10 @@ def get_gold_table(
         pl.LazyFrame: The gold table.
     """
     app_names = options.get("app_names")
-    columns_names = options.get("columns_names")
+    column_names = options.get("column_names")
 
     rfm_tbl = get_rfm_table(sources)
-    pivot_tbl = get_pivot_table(sources, app_names, columns_names)
+    pivot_tbl = get_pivot_table(sources, app_names, column_names)
     most_watch_tbl = get_most_watch(pivot_tbl)
 
     return (

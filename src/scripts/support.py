@@ -1,5 +1,5 @@
 import os
-from typing import Any, List, Mapping, Literal
+from typing import Any, List, Mapping, Literal, Optional
 
 import dotenv
 import polars as pl
@@ -171,7 +171,8 @@ def sink_to_s3(
 def sink_delta_to_s3(
     tables: pl.LazyFrame,
     target: str,
-    mode: Literal["error", "append", "overwrite", "ignore"],
+    mode: Literal["error", "append", "overwrite", "ignore"] = "append",
+    delta_write_options: Optional[dict[str, Any]] = None,
 ) -> None:
     """
     Sink the proprietary table to delta lake in s3.
@@ -180,6 +181,7 @@ def sink_delta_to_s3(
         tables (pl.LazyFrame): a LazyFrame
         target (str): the path to store in s3 delta lake
         mode (str): mode to sink delta lake (append, overwite, error)
+        delta_write_options (Optional[dict[str, Any]]): delta write options
 
     Returns:
 
@@ -197,9 +199,7 @@ def sink_delta_to_s3(
             "AWS_ALLOW_HTTP": "true",
             "AWS_S3_ALLOW_UNSAFE_RENAME": "true",
         },
-        delta_write_options={
-            "engine": "rust",
-        },
+        delta_write_options=delta_write_options,
     )
 
 
@@ -219,7 +219,8 @@ def type2_scd_upsert_pl(
     Note that, the datatypes of **effective_time_col** and **end_time_col** should be in **pl.Datetime** dtypes
 
     Args:
-        sources_df (pl.LazyFrame): The source or target Polars LazyFrame scanned from DeltaLake using pl.scan_delta().
+        sources_df (pl.LazyFrame): The source or target Polars LazyFrame scanned from DeltaLake using
+        pl.scan_delta().
         updates_df (pl.LazyFrame): The Polars LazyFrame representing the updates data.
         primary_key (str): The name of the primary key column.
         target (str): The name of the target table to write the upserted records.
@@ -257,7 +258,8 @@ def type2_scd_upsert_pl(
         )
     if not isinstance(sources_df.schema.get(effective_time_col), pl.Datetime):
         raise TypeError(
-            f"Datatypes of {effective_time_col} should be in Datetime, got {sources_df.schema.get(effective_time_col)}"
+            f"Datatypes of {effective_time_col} should be in Datetime, got "
+            f"{sources_df.schema.get(effective_time_col)}"
         )
     if not isinstance(sources_df.schema.get(end_time_col), pl.Datetime):
         raise TypeError(
@@ -265,7 +267,8 @@ def type2_scd_upsert_pl(
         )
     if not isinstance(updates_df.schema.get(effective_time_col), pl.Datetime):
         raise TypeError(
-            f"Datatypes of {effective_time_col} should be in Datetime, got {updates_df.schema.get(effective_time_col)}"
+            f"Datatypes of {effective_time_col} should be in Datetime, got "
+            f"{updates_df.schema.get(effective_time_col)}"
         )
 
     new_records = updates_df.join(sources_df, on=primary_key, how="anti").with_columns(

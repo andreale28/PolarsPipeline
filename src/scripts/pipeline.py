@@ -2,6 +2,8 @@ from typing import List
 
 import dotenv
 import polars as pl
+import polars.selectors as ps
+from src.helpers.utils import all_combinations_with_replacement_iterative
 
 dotenv.load_dotenv()
 
@@ -33,6 +35,26 @@ def get_rfm_table(
         pl.lit(reported_date).str.to_date("%Y %m %d").alias("ReportedDate")
     )
 
+    ref = (
+        pl.LazyFrame(
+            {"RFM": all_combinations_with_replacement_iterative(["1", "2", "3"])}
+        )
+        .select(pl.col("RFM").list.join("").cast(pl.Int64).alias("RFM"))
+        .with_columns(
+            pl.col("RFM")
+            .qcut(
+                4,
+                labels=[
+                    "lost customers",
+                    "potential loyalist",
+                    "loyal customers",
+                    "champions",
+                ],
+            )
+            .cast(pl.String)
+            .alias("TypeOfCustomers"),
+        )
+    )
     rfm = (
         temp.filter(pl.col("Contract").str.len_chars() > 1)
         .join(b, on="Contract", how="left")
@@ -60,6 +82,11 @@ def get_rfm_table(
             pl.concat_str([pl.col("R"), pl.col("F"), pl.col("M")])
             .alias("RFM")
             .cast(pl.Int64),
+        )
+        .join(
+            ref,
+            on="RFM",
+            how="left",
         )
     )
 
@@ -174,10 +201,18 @@ def get_gold_table(
         pivot_tbl.join(rfm_tbl, on="Contract", how="left")
         .join(most_watch_tbl, on="Contract", how="left")
         .with_columns(
+            pl.sum_horizontal(ps.ends_with("Duration")).alias("SumDuration"),
             pl.lit(True).alias("is_current"),
             pl.lit(reported_date)
             .str.strptime(pl.Datetime, format="%Y %m %d")
             .alias("effective_time"),
             pl.lit(None, pl.Datetime).alias("end_time"),
+        )
+        .select(
+            pl.col("Contract"),
+            ps.ends_with("Duration"),
+            pl.col(
+                "RFM", "TypeOfCustomers", "is_current", "effective_time", "end_time"
+            ),
         )
     )

@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from itertools import product
 
 
 def create_date_directories(base_path, start_date, end_date, format="%Y%m%d"):
@@ -45,12 +46,24 @@ def create_date_directories(base_path, start_date, end_date, format="%Y%m%d"):
     return directory_paths
 
 
-# # Example usage
-# base_path = "data/log_content/"
-# start_date = "20220401"
-# end_date = "20220430"
-# directory_paths = create_date_directories(base_path, start_date, end_date)
-#
-# print("Created directories:")
-# for path in directory_paths:
-#     print(path)
+def all_combinations_with_replacement_iterative(numbers):
+    """
+    This function generates all possible combinations of elements in a list,
+    including replacements, using an iterative approach.
+
+    Args:
+        numbers (List[int]): A list of numbers.
+
+    Returns:
+        List[List[int]]: A list of lists, where each inner list represents
+                         a combination of elements from the input list.
+    """
+    combinations = []
+    for length in range(1, len(numbers) + 1):
+        if length != len(numbers):
+            pass
+        else:
+            combinations.extend(
+                product(numbers, repeat=length)
+            )  # Use product for efficient generation
+    return combinations
